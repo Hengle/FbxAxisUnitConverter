@@ -1,6 +1,21 @@
 #include "TransformProcessor.h"
 #include <cmath>
 
+// 3x3 サブ行列が単位行列かどうか確認（axis swizzle が不要なケースの判定）
+static bool IsRotationIdentity(const FbxAMatrix& m)
+{
+    for (int r = 0; r < 3; ++r)
+    {
+        FbxVector4 row = m.GetRow(r);
+        for (int c = 0; c < 3; ++c)
+        {
+            double expected = (r == c) ? 1.0 : 0.0;
+            if (std::abs(row[c] - expected) > 1e-6) return false;
+        }
+    }
+    return true;
+}
+
 void TransformProcessor::ProcessNode(FbxNode* node, const FbxAMatrix& convMatrix, double scale)
 {
     if (!node) return;
@@ -18,9 +33,13 @@ void TransformProcessor::ProcessNodeRecursive(FbxNode* node, const FbxAMatrix& c
     }
 
     // --- LclRotation: change of basis
-    //   R_dst = M^(-1) * R_src * M  (row-vector convention: v_dst = v_src * M)
-    //   with column-vector (FBX): equivalent to M * R_src * M^(-1)
+    //   R_dst = M * R_src * M^(-1)  (column-vector convention)
+    //
+    //   NOTE: SetR/GetR のオイラー角ラウンドトリップは一意ではない（Y角が ±90° を
+    //   超えるケースで等価な別解に収束することがある）。変換行列が単位行列の場合は
+    //   値を保持するためスキップする。
     // ---
+    if (!IsRotationIdentity(convMatrix))
     {
         FbxDouble3 rD3 = node->LclRotation.Get();
         FbxVector4 rVec(rD3[0], rD3[1], rD3[2], 0.0);

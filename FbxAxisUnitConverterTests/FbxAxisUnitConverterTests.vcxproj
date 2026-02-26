@@ -1,0 +1,160 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Project DefaultTargets="Build" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+
+  <!-- ===== Configurations ===== -->
+  <ItemGroup Label="ProjectConfigurations">
+    <ProjectConfiguration Include="Debug|x64">
+      <Configuration>Debug</Configuration>
+      <Platform>x64</Platform>
+    </ProjectConfiguration>
+    <ProjectConfiguration Include="Release|x64">
+      <Configuration>Release</Configuration>
+      <Platform>x64</Platform>
+    </ProjectConfiguration>
+  </ItemGroup>
+
+  <!-- ===== Globals ===== -->
+  <PropertyGroup Label="Globals">
+    <VCProjectVersion>17.0</VCProjectVersion>
+    <ProjectGuid>{D71C91AF-F94E-4526-AF94-2281FFF75D57}</ProjectGuid>
+    <Keyword>Win32Proj</Keyword>
+    <RootNamespace>FbxAxisUnitConverterTests</RootNamespace>
+    <WindowsTargetPlatformVersion>10.0</WindowsTargetPlatformVersion>
+    <FbxSdkDir>C:\Program Files\Autodesk\FBX\FBX SDK\2020.3.9\</FbxSdkDir>
+  </PropertyGroup>
+
+  <Import Project="$(VCTargetsPath)\Microsoft.Cpp.Default.props" />
+
+  <!-- ===== Configuration Properties ===== -->
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'" Label="Configuration">
+    <ConfigurationType>Application</ConfigurationType>
+    <UseDebugLibraries>true</UseDebugLibraries>
+    <PlatformToolset>v143</PlatformToolset>
+    <CharacterSet>Unicode</CharacterSet>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'" Label="Configuration">
+    <ConfigurationType>Application</ConfigurationType>
+    <UseDebugLibraries>false</UseDebugLibraries>
+    <PlatformToolset>v143</PlatformToolset>
+    <CharacterSet>Unicode</CharacterSet>
+  </PropertyGroup>
+
+  <Import Project="$(VCTargetsPath)\Microsoft.Cpp.props" />
+  <ImportGroup Label="ExtensionSettings" />
+  <ImportGroup Label="Shared" />
+
+  <ImportGroup Label="PropertySheets" Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
+    <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props"
+            Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')"
+            Label="LocalAppDataPlatform" />
+  </ImportGroup>
+  <ImportGroup Label="PropertySheets" Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
+    <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props"
+            Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')"
+            Label="LocalAppDataPlatform" />
+  </ImportGroup>
+
+  <!-- ===== Output directories ===== -->
+  <PropertyGroup>
+    <OutDir>$(SolutionDir)x64\$(Configuration)\</OutDir>
+    <IntDir>$(SolutionDir)x64\$(Configuration)\$(ProjectName)\</IntDir>
+  </PropertyGroup>
+
+  <!-- ===== Debug compile/link ===== -->
+  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
+    <ClCompile>
+      <WarningLevel>Level3</WarningLevel>
+      <SDLCheck>true</SDLCheck>
+      <PreprocessorDefinitions>WIN32;_DEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <ConformanceMode>true</ConformanceMode>
+      <LanguageStandard>stdcpp17</LanguageStandard>
+      <RuntimeLibrary>MultiThreadedDebugDLL</RuntimeLibrary>
+      <AdditionalOptions>/utf-8 %(AdditionalOptions)</AdditionalOptions>
+      <AdditionalIncludeDirectories>
+        $(FbxSdkDir)include;
+        $(SolutionDir)third_party\googletest\googletest\include;
+        $(SolutionDir)third_party\googletest\googletest;
+        $(SolutionDir)FbxAxisUnitConverter;
+        %(AdditionalIncludeDirectories)
+      </AdditionalIncludeDirectories>
+    </ClCompile>
+    <Link>
+      <SubSystem>Console</SubSystem>
+      <GenerateDebugInformation>true</GenerateDebugInformation>
+      <AdditionalLibraryDirectories>$(FbxSdkDir)lib\x64\debug;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
+      <AdditionalDependencies>libfbxsdk-md.lib;libxml2-md.lib;zlib-md.lib;%(AdditionalDependencies)</AdditionalDependencies>
+    </Link>
+  </ItemDefinitionGroup>
+
+  <!-- ===== Release compile/link ===== -->
+  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
+    <ClCompile>
+      <WarningLevel>Level3</WarningLevel>
+      <SDLCheck>true</SDLCheck>
+      <PreprocessorDefinitions>WIN32;NDEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <ConformanceMode>true</ConformanceMode>
+      <LanguageStandard>stdcpp17</LanguageStandard>
+      <RuntimeLibrary>MultiThreadedDLL</RuntimeLibrary>
+      <AdditionalOptions>/utf-8 %(AdditionalOptions)</AdditionalOptions>
+      <AdditionalIncludeDirectories>
+        $(FbxSdkDir)include;
+        $(SolutionDir)third_party\googletest\googletest\include;
+        $(SolutionDir)third_party\googletest\googletest;
+        $(SolutionDir)FbxAxisUnitConverter;
+        %(AdditionalIncludeDirectories)
+      </AdditionalIncludeDirectories>
+    </ClCompile>
+    <Link>
+      <SubSystem>Console</SubSystem>
+      <EnableCOMDATFolding>true</EnableCOMDATFolding>
+      <OptimizeReferences>true</OptimizeReferences>
+      <AdditionalLibraryDirectories>$(FbxSdkDir)lib\x64\release;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
+      <AdditionalDependencies>libfbxsdk-md.lib;libxml2-md.lib;zlib-md.lib;%(AdditionalDependencies)</AdditionalDependencies>
+    </Link>
+  </ItemDefinitionGroup>
+
+  <!-- ===== Source files ===== -->
+  <ItemGroup>
+    <!-- Test entry point -->
+    <ClCompile Include="TestMain.cpp" />
+
+    <!-- Test cases -->
+    <ClCompile Include="Test_IdentityConversion.cpp" />
+    <ClCompile Include="Test_ZupToYup.cpp" />
+    <ClCompile Include="Test_PreRotation.cpp" />
+    <ClCompile Include="Test_SharedMesh.cpp" />
+    <ClCompile Include="Test_DeepHierarchy.cpp" />
+    <ClCompile Include="Test_UnitOnly.cpp" />
+    <ClCompile Include="Test_RotationOrder.cpp" />
+
+    <!-- Shared production sources (exclude main.cpp) -->
+    <ClCompile Include="..\FbxAxisUnitConverter\FbxAxisUnitConverter.cpp" />
+    <ClCompile Include="..\FbxAxisUnitConverter\TransformProcessor.cpp" />
+    <ClCompile Include="..\FbxAxisUnitConverter\GeometryProcessor.cpp" />
+    <ClCompile Include="..\FbxAxisUnitConverter\AnimProcessor.cpp" />
+    <ClCompile Include="..\FbxAxisUnitConverter\ArgumentParser.cpp" />
+
+    <!-- Google Test amalgam -->
+    <ClCompile Include="..\third_party\googletest\googletest\src\gtest-all.cc">
+      <AdditionalIncludeDirectories>
+        $(SolutionDir)third_party\googletest\googletest;
+        %(AdditionalIncludeDirectories)
+      </AdditionalIncludeDirectories>
+    </ClCompile>
+  </ItemGroup>
+
+  <!-- ===== Header files ===== -->
+  <ItemGroup>
+    <ClInclude Include="TestHelpers.h" />
+    <ClInclude Include="..\FbxAxisUnitConverter\ConvertOptions.h" />
+    <ClInclude Include="..\FbxAxisUnitConverter\FbxAxisUnitConverter.h" />
+    <ClInclude Include="..\FbxAxisUnitConverter\TransformProcessor.h" />
+    <ClInclude Include="..\FbxAxisUnitConverter\GeometryProcessor.h" />
+    <ClInclude Include="..\FbxAxisUnitConverter\AnimProcessor.h" />
+    <ClInclude Include="..\FbxAxisUnitConverter\ArgumentParser.h" />
+  </ItemGroup>
+
+  <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
+  <ImportGroup Label="ExtensionTargets" />
+
+</Project>

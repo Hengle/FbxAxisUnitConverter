@@ -107,9 +107,9 @@ static void BuildMatrix(
     FbxAMatrix& outMatrix, bool& outFlipWinding)
 {
     double m[3][3] = {};
-    m[dstRight.axis][srcRight.axis] = (double)(dstRight.sign * srcRight.sign);
-    m[dstUp.axis   ][srcUp.axis   ] = (double)(dstUp.sign    * srcUp.sign   );
-    m[dstFwd.axis  ][srcFwd.axis  ] = (double)(dstFwd.sign   * srcFwd.sign  );
+    m[srcRight.axis][dstRight.axis] = (double)(srcRight.sign * dstRight.sign);
+    m[srcUp.axis   ][dstUp.axis   ] = (double)(srcUp.sign    * dstUp.sign   );
+    m[srcFwd.axis  ][dstFwd.axis  ] = (double)(srcFwd.sign   * dstFwd.sign  );
 
     // Set rows of the 4x4 matrix (row 3 = translation, w = 1)
     outMatrix.SetRow(0, FbxVector4(m[0][0], m[0][1], m[0][2], 0.0));
@@ -266,12 +266,39 @@ void FbxAxisUnitConverter::ApplyGlobalSettings()
     }
 }
 
+static void DumpNodeRotations(FbxNode* node, int depth = 0)
+{
+    if (!node) return;
+    std::string indent(depth * 2, ' ');
+    FbxDouble3 r = node->LclRotation.Get();
+    std::cout << indent << "[Node] " << node->GetName()
+              << "  LclRot=(" << r[0] << ", " << r[1] << ", " << r[2] << ")\n";
+    for (int i = 0; i < node->GetChildCount(); ++i)
+        DumpNodeRotations(node->GetChild(i), depth + 1);
+}
+
 void FbxAxisUnitConverter::ProcessScene()
 {
+    // --- Debug: dump conversion matrix ---
+    std::cout << "[Debug] ConvMatrix rows:\n";
+    for (int r = 0; r < 4; ++r)
+    {
+        FbxVector4 row = mConvMatrix.GetRow(r);
+        std::cout << "  row" << r << ": ("
+                  << row[0] << ", " << row[1] << ", "
+                  << row[2] << ", " << row[3] << ")\n";
+    }
+
+    std::cout << "[Debug] Node rotations BEFORE transform:\n";
+    DumpNodeRotations(mScene->GetRootNode());
+
     GeometryProcessor geoProc(mFlipWinding);
     geoProc.ProcessScene(mScene, mConvMatrix, mScaleFactor);
 
     TransformProcessor::ProcessNode(mScene->GetRootNode(), mConvMatrix, mScaleFactor);
+
+    std::cout << "[Debug] Node rotations AFTER transform:\n";
+    DumpNodeRotations(mScene->GetRootNode());
 
     AnimProcessor::ProcessAnimation(mScene, mConvMatrix, mScaleFactor);
 }
