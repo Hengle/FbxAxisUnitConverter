@@ -16,7 +16,7 @@ FBX ファイルの **軸系**（Up/Forward ベクトル）と**単位**（cm, m
 
 | 項目 | バージョン |
 |------|-----------|
-| Autodesk FBX SDK | 2020.x 以降（DLL リンク） |
+| Autodesk FBX SDK | 2020.x 以降（スタティックリンク） |
 | Visual Studio | 2022 (Build Tools v143) |
 | C++ 規格 | C++17 |
 | プラットフォーム | x64 |
@@ -33,11 +33,7 @@ FBX SDK は `C:\Program Files\Autodesk\FBX\FBX SDK\2020.x.x\` にインストー
 
 出力: `x64\Release\FbxAxisUnitConverter.exe`
 
-実行時は FBX SDK の DLL (`libfbxsdk.dll`) が PATH に含まれている必要があります。
-
-```powershell
-$env:PATH = "C:\Program Files\Autodesk\FBX\FBX SDK\2020.3.9\lib\x64\release;" + $env:PATH
-```
+FBX SDK はスタティックリンクのため、実行時に追加の DLL は不要です。
 
 ## 使い方
 
