@@ -11,6 +11,7 @@ FBX ファイルの **軸系**（Up/Forward ベクトル）と**単位**（cm, m
 - **ノード Transform 変換** — LclTranslation / LclRotation / LclScaling の書き換え
 - **共有メッシュ対応** — インスタンス化されたメッシュの重複変換を防止
 - **入力軸/単位の自動検出** — FBX の GlobalSettings から読み取り（引数で上書き可能）
+- **Pre-normalization** — Blender 等の DCC ツールがルートオブジェクトに焼き込んだ補正変換を除去してから通常変換を行う
 
 ## ビルド要件
 
@@ -49,10 +50,16 @@ Options:
   --src-up      <axis>   入力の Up ベクトルを上書き
   --src-forward <axis>   入力の Forward ベクトルを上書き
   --src-unit    <unit>   入力の単位を上書き
+
+Pre-normalization（--pre-norm-* と --src-* は排他）:
+  --pre-norm-up      <axis>   補正前の実効 Up 軸    例: Z
+  --pre-norm-forward <axis>   補正前の実効 Forward 軸  例: Y
+  --pre-norm-unit    <unit>   補正前の実効単位       例: m
 ```
 
 `--up` と `--forward` は **両方同時に指定するか、両方省略**してください。
 Up ベクトルと Forward ベクトルは**直交**していなければなりません。
+`--pre-norm-up` と `--pre-norm-forward` も同様のルールが適用されます。
 
 ### 使用例
 
@@ -70,6 +77,11 @@ FbxAxisUnitConverter -i model.fbx -o out.fbx --unit m
 FbxAxisUnitConverter -i model.fbx -o out.fbx \
     --src-up Y --src-forward -Z \
     --up Z --forward Y
+
+# Blender デフォルト出力（メタデータ: Y-up/cm、実態: Z-up/m）を Y-up/cm に変換
+FbxAxisUnitConverter -i blender_export.fbx -o out.fbx \
+    --pre-norm-up Z --pre-norm-forward Y --pre-norm-unit m \
+    --up Y --forward -Z --unit cm
 ```
 
 ### Forward ベクトルの定義
@@ -83,6 +95,22 @@ FbxAxisUnitConverter -i model.fbx -o out.fbx \
 | 3ds Max        | Z    | Y         |
 | Maya (Y-up)    | Y    | -Z        |
 | Maya (Z-up)    | Z    | -Y        |
+
+### Pre-normalization について
+
+Blender などの DCC ツールは、内部座標系（例: Z-up, m）と異なる設定で FBX をエクスポートする場合、FBX メタデータの軸/単位を書き換えたうえで、シーン内の各ルートオブジェクトに補正変換（LclRotation, LclScaling など）を焼き込みます。
+
+`--pre-norm-*` オプションを使うと、変換パイプラインの先頭でその補正変換を自動的に除去し、その後の通常変換が正しい実効軸/単位を起点として動作するようになります。
+
+**Blender の FBX エクスポート（デフォルト設定）の場合:**
+- メタデータ上の軸系: Y-up / cm
+- 実際のモデルは Z-up / m で作られており、各ルートオブジェクトに `LclRotation=(-90, 0, 0)`, `LclScaling=(100, 100, 100)` が焼き込まれている
+
+```bash
+FbxAxisUnitConverter -i blender_export.fbx -o out.fbx \
+    --pre-norm-up Z --pre-norm-forward Y --pre-norm-unit m \
+    --up Y --forward -Z --unit cm
+```
 
 ## 制限事項
 

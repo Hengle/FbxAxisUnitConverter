@@ -12,11 +12,12 @@ public:
     int Run();
 
 private:
+    void PreNormalize();
     void BuildConversionMatrix();
     void ApplyGlobalSettings();
     void ProcessScene();
 
-    const ConvertOptions& mOptions;
+    ConvertOptions mOptions;  // value型（PreNormalize() で srcUp/srcForward/srcUnit を上書き可能）
     FbxManager*  mManager = nullptr;
     FbxScene*    mScene   = nullptr;
 

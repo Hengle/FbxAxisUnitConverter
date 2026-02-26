@@ -58,7 +58,13 @@ void ArgumentParser::PrintUsage(const char* programName)
               << "  --unit        <unit>   Output unit (mm|cm|dm|m|km|inch|foot|yard|mile)\n"
               << "  --src-up      <axis>   Override input Up vector\n"
               << "  --src-forward <axis>   Override input Forward vector\n"
-              << "  --src-unit    <unit>   Override input unit\n";
+              << "  --src-unit    <unit>   Override input unit\n"
+              << "\nPre-normalization (removes baked correction from root objects, e.g. Blender export):\n"
+              << "  --pre-norm-up      <axis>   Effective source Up axis before baking (e.g. Z)\n"
+              << "  --pre-norm-forward <axis>   Effective source Forward axis before baking (e.g. Y)\n"
+              << "  --pre-norm-unit    <unit>   Effective source unit before baking (e.g. m)\n"
+              << "  Note: --pre-norm-up/--pre-norm-forward must be specified together.\n"
+              << "        Cannot be combined with --src-up/--src-forward/--src-unit.\n";
 }
 
 ConvertOptions ArgumentParser::Parse(int argc, char* argv[])
@@ -92,6 +98,12 @@ ConvertOptions ArgumentParser::Parse(int argc, char* argv[])
             opts.srcForward = ParseAxisVector(getNext(i));
         else if (arg == "--src-unit")
             opts.srcUnit = ParseUnit(getNext(i));
+        else if (arg == "--pre-norm-up")
+            opts.preNormUp = ParseAxisVector(getNext(i));
+        else if (arg == "--pre-norm-forward")
+            opts.preNormForward = ParseAxisVector(getNext(i));
+        else if (arg == "--pre-norm-unit")
+            opts.preNormUnit = ParseUnit(getNext(i));
         else if (arg == "-h" || arg == "--help")
         {
             PrintUsage(argv[0]);
@@ -140,6 +152,29 @@ ConvertOptions ArgumentParser::Parse(int argc, char* argv[])
                 "Error: --src-up and --src-forward vectors must be orthogonal. Got up=" + upStr + ", forward=" + fwdStr + ".");
         }
     }
+
+    // --pre-norm-up/--pre-norm-forward は両方指定するか、両方省略する
+    if (opts.preNormUp.has_value() != opts.preNormForward.has_value())
+        throw std::runtime_error("--pre-norm-up and --pre-norm-forward must both be specified or both omitted.");
+
+    // pre-norm 軸の直交チェック
+    if (opts.preNormUp.has_value() && opts.preNormForward.has_value())
+    {
+        if (!opts.preNormUp->IsOrthogonalTo(*opts.preNormForward))
+        {
+            const char* axisNames[] = { "X", "Y", "Z" };
+            std::string upStr  = (opts.preNormUp->sign < 0 ? "-" : "") + std::string(axisNames[opts.preNormUp->axis]);
+            std::string fwdStr = (opts.preNormForward->sign < 0 ? "-" : "") + std::string(axisNames[opts.preNormForward->axis]);
+            throw std::runtime_error(
+                "Error: --pre-norm-up and --pre-norm-forward vectors must be orthogonal. Got up=" + upStr + ", forward=" + fwdStr + ".");
+        }
+    }
+
+    // --pre-norm-* と --src-* は排他
+    bool hasPreNorm    = opts.preNormUp.has_value() || opts.preNormUnit.has_value();
+    bool hasSrcOverride = opts.srcUp.has_value() || opts.srcUnit.has_value();
+    if (hasPreNorm && hasSrcOverride)
+        throw std::runtime_error("--pre-norm-* and --src-* options cannot be used together.");
 
     return opts;
 }

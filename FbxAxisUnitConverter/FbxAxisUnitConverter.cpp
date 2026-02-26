@@ -160,6 +160,9 @@ int FbxAxisUnitConverter::Run()
 
     std::cout << "[Info] Loaded: " << mOptions.inputPath << "\n";
 
+    // --- Pre-normalization (ルートオブジェクトの補正変換を除去) ---
+    PreNormalize();
+
     // --- Build conversion matrix ---
     BuildConversionMatrix();
 
@@ -181,6 +184,89 @@ int FbxAxisUnitConverter::Run()
 
     std::cout << "[Info] Saved: " << mOptions.outputPath << "\n";
     return 0;
+}
+
+void FbxAxisUnitConverter::PreNormalize()
+{
+    bool hasAxis = mOptions.preNormUp.has_value() && mOptions.preNormForward.has_value();
+    bool hasUnit = mOptions.preNormUnit.has_value();
+    if (!hasAxis && !hasUnit) return;
+
+    std::cout << "[Info] Pre-normalization: removing baked correction transforms from root children.\n";
+
+    FbxGlobalSettings& gs = mScene->GetGlobalSettings();
+
+    // FBXメタデータから fileSrc 軸系・単位を取得
+    auto [fileSrcUp, fileSrcFwd] = DecodeAxisSystem(gs.GetAxisSystem());
+    FbxSystemUnit fileSrcUnit = gs.GetSystemUnit();
+
+    // preNorm → fileSrc の変換行列を構築
+    FbxAMatrix corrMatrix;
+    corrMatrix.SetIdentity();
+    bool dummyFlip = false;
+
+    if (hasAxis)
+    {
+        AxisVector preNormUp    = *mOptions.preNormUp;
+        AxisVector preNormFwd   = *mOptions.preNormForward;
+        AxisVector preNormRight = ComputeRight(preNormUp, preNormFwd);
+        AxisVector fileSrcRight = ComputeRight(fileSrcUp, fileSrcFwd);
+
+        BuildMatrix(preNormUp, preNormFwd, preNormRight,
+                    fileSrcUp, fileSrcFwd, fileSrcRight,
+                    corrMatrix, dummyFlip);
+
+        const char* axisNames[] = { "X", "Y", "Z" };
+        auto axStr = [&](const AxisVector& v) -> std::string {
+            return (v.sign < 0 ? "-" : "+") + std::string(axisNames[v.axis]);
+        };
+        std::cout << "[Info] PreNorm src: up=" << axStr(preNormUp) << " fwd=" << axStr(preNormFwd)
+                  << " right=" << axStr(preNormRight) << "\n";
+        std::cout << "[Info] FileSrc:     up=" << axStr(fileSrcUp) << " fwd=" << axStr(fileSrcFwd)
+                  << " right=" << axStr(fileSrcRight) << "\n";
+    }
+
+    FbxAMatrix corrInv = corrMatrix.Inverse();
+
+    // 単位スケールの逆数を計算
+    double scaleInv = 1.0;
+    if (hasUnit)
+    {
+        FbxSystemUnit preNormUnit = *mOptions.preNormUnit;
+        double corrScale = fileSrcUnit.GetScaleFactor() / preNormUnit.GetScaleFactor();
+        scaleInv = 1.0 / corrScale;
+        std::cout << "[Info] PreNorm unit: fileSrc=" << fileSrcUnit.GetScaleFactor()
+                  << "cm  preNorm=" << preNormUnit.GetScaleFactor()
+                  << "cm  corrScale=" << corrScale << "  scaleInv=" << scaleInv << "\n";
+    }
+
+    // ルートの直接子ノードに逆補正を適用
+    FbxNode* root = mScene->GetRootNode();
+    int childCount = root->GetChildCount();
+    for (int i = 0; i < childCount; ++i)
+    {
+        FbxNode* child = root->GetChild(i);
+        TransformProcessor::ApplySingleNode(child, corrInv, corrMatrix, scaleInv);
+
+        FbxDouble3 r = child->LclRotation.Get();
+        FbxDouble3 s = child->LclScaling.Get();
+        FbxDouble3 t = child->LclTranslation.Get();
+        std::cout << "[Debug] After pre-norm, node '" << child->GetName() << "':"
+                  << " LclRot=("   << r[0] << "," << r[1] << "," << r[2] << ")"
+                  << " LclScale=(" << s[0] << "," << s[1] << "," << s[2] << ")"
+                  << " LclTrans=(" << t[0] << "," << t[1] << "," << t[2] << ")\n";
+    }
+
+    // BuildConversionMatrix() が preNorm 空間を src として使うよう上書き
+    if (hasAxis)
+    {
+        mOptions.srcUp      = mOptions.preNormUp;
+        mOptions.srcForward = mOptions.preNormForward;
+    }
+    if (hasUnit)
+    {
+        mOptions.srcUnit = mOptions.preNormUnit;
+    }
 }
 
 void FbxAxisUnitConverter::BuildConversionMatrix()

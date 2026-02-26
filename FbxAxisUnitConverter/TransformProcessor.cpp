@@ -16,6 +16,61 @@ static bool IsRotationIdentity(const FbxAMatrix& m)
     return true;
 }
 
+void TransformProcessor::ApplySingleNode(FbxNode* node,
+                                         const FbxAMatrix& corrInv,
+                                         const FbxAMatrix& corrMatrix,
+                                         double scaleInv)
+{
+    if (!node) return;
+
+    // --- LclTranslation: 逆回転（軸置換）+ 単位スケール除去 ---
+    // FbxAMatrix::MultT は行ベクトル規約 (v^T * M)。
+    // M_eff(corrInv) = Rx(+90°) なので corrInv.MultT(v) が fileSrc→preNorm 変換を行う。
+    // T_orig = M_eff(corrInv) * T_baked = corrInv.MultT(T_baked)
+    {
+        FbxDouble3 t = node->LclTranslation.Get();
+        FbxVector4 tVec(t[0], t[1], t[2], 0.0);
+        FbxVector4 tRestored = corrInv.MultT(tVec);
+        node->LclTranslation.Set(FbxDouble3(
+            tRestored[0] * scaleInv,
+            tRestored[1] * scaleInv,
+            tRestored[2] * scaleInv));
+    }
+
+    // --- LclRotation: 逆変換 R_orig = M_eff(corrInv) * R_baked ---
+    // FbxAMatrix の * は行ベクトル規約: M_eff(A*B) = M_eff(B) * M_eff(A)（順序逆）
+    // したがって "srcRot * corrInv" の実効 = M_eff(corrInv) * M_eff(srcRot) = Rx(+90°) * R_baked
+    if (!IsRotationIdentity(corrMatrix))
+    {
+        FbxDouble3 r = node->LclRotation.Get();
+        FbxAMatrix srcRot;
+        srcRot.SetR(FbxVector4(r[0], r[1], r[2], 0.0));
+        FbxAMatrix rRestored = srcRot * corrInv;
+        FbxVector4 euler = rRestored.GetR();
+        node->LclRotation.Set(FbxDouble3(euler[0], euler[1], euler[2]));
+    }
+
+    // --- LclScaling: 軸置換 + 単位スケール除去 ---
+    // corrInv の各行から置換マッピングを逆引きし、scaleInv を乗算する
+    {
+        FbxDouble3 s = node->LclScaling.Get();
+        FbxDouble3 sRestored(1.0, 1.0, 1.0);
+        for (int dstAxis = 0; dstAxis < 3; ++dstAxis)
+        {
+            FbxVector4 row = corrInv.GetRow(dstAxis);
+            for (int srcAxis = 0; srcAxis < 3; ++srcAxis)
+            {
+                if (std::abs(row[srcAxis]) > 0.5)
+                {
+                    sRestored[dstAxis] = s[srcAxis] * scaleInv;
+                    break;
+                }
+            }
+        }
+        node->LclScaling.Set(sRestored);
+    }
+}
+
 void TransformProcessor::ProcessNode(FbxNode* node, const FbxAMatrix& convMatrix, double scale)
 {
     if (!node) return;

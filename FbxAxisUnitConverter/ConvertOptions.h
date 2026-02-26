@@ -27,4 +27,9 @@ struct ConvertOptions
 
     std::optional<FbxSystemUnit> srcUnit;
     std::optional<FbxSystemUnit> dstUnit;
+
+    // Pre-normalization: ルートオブジェクトに焼き込まれた補正変換を除去する
+    std::optional<AxisVector>    preNormUp;
+    std::optional<AxisVector>    preNormForward;
+    std::optional<FbxSystemUnit> preNormUnit;
 };
