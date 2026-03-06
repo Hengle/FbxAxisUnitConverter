@@ -10,8 +10,9 @@ public:
     void ProcessScene(FbxScene* scene, const FbxAMatrix& convMatrix, double scale);
 
 private:
-    void ProcessMesh(FbxMesh* mesh, const FbxAMatrix& convMatrix, double scale);
+    void ProcessMesh(FbxMesh* mesh, const FbxAMatrix& convMatrix, const FbxAMatrix& convInv, double scale);
     void ProcessSkin(FbxMesh* mesh, const FbxAMatrix& convMatrix, const FbxAMatrix& convInv, double scale);
+    void ProcessPoses(FbxScene* scene, const FbxAMatrix& convMatrix, const FbxAMatrix& convInv, double scale);
     void FlipWindingOrder(FbxMesh* mesh);
 
     bool mFlipWinding;

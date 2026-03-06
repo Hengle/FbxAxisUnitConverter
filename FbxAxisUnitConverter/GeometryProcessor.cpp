@@ -1,6 +1,7 @@
 #include "GeometryProcessor.h"
 #include <iostream>
 #include <algorithm>
+#include <vector>
 
 // ---------------------------------------------------------------------------
 // Helper: reverse per-polygon-vertex entries of a typed layer element
@@ -56,15 +57,23 @@ GeometryProcessor::GeometryProcessor(bool flipWinding)
 
 void GeometryProcessor::ProcessScene(FbxScene* scene, const FbxAMatrix& convMatrix, double scale)
 {
+    // convInv は全メッシュ・ポーズで共通なので一度だけ計算する
+    FbxAMatrix convInv = convMatrix.Inverse();
+
     int meshCount = scene->GetSrcObjectCount<FbxMesh>();
     for (int i = 0; i < meshCount; ++i)
     {
         FbxMesh* mesh = scene->GetSrcObject<FbxMesh>(i);
-        ProcessMesh(mesh, convMatrix, scale);
+        ProcessMesh(mesh, convMatrix, convInv, scale);
     }
+
+    // FbxPose (バインドポーズ) の変換
+    // Blender はバインドポーズを TransformLinkMatrix より優先して参照するため、
+    // 変換しないとボーンが元座標系のままになる
+    ProcessPoses(scene, convMatrix, convInv, scale);
 }
 
-void GeometryProcessor::ProcessMesh(FbxMesh* mesh, const FbxAMatrix& convMatrix, double scale)
+void GeometryProcessor::ProcessMesh(FbxMesh* mesh, const FbxAMatrix& convMatrix, const FbxAMatrix& convInv, double scale)
 {
     if (mProcessedMeshes.count(mesh)) return;
 
@@ -160,7 +169,6 @@ void GeometryProcessor::ProcessMesh(FbxMesh* mesh, const FbxAMatrix& convMatrix,
     }
 
     // --- Skin deformers ---
-    FbxAMatrix convInv = convMatrix.Inverse();
     ProcessSkin(mesh, convMatrix, convInv, scale);
 
     // --- Winding order flip (when handedness changes) ---
@@ -228,6 +236,73 @@ void GeometryProcessor::ProcessSkin(
             mProcessedClusters.insert(cluster);
             std::cout << "[Geometry] Processed cluster: " << cluster->GetName() << "\n";
         }
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Helper: FbxMatrix <-> FbxAMatrix の相互変換 (SetRow 経由)
+// FbxAMatrix のコンストラクターに FbxMatrix を渡す直接変換は SDK に存在しないため
+// ---------------------------------------------------------------------------
+static FbxAMatrix FbxMatrixToAMatrix(const FbxMatrix& m)
+{
+    FbxAMatrix am;
+    am.SetRow(0, m.GetRow(0));
+    am.SetRow(1, m.GetRow(1));
+    am.SetRow(2, m.GetRow(2));
+    am.SetRow(3, m.GetRow(3));
+    return am;
+}
+
+static FbxMatrix FbxAMatrixToMatrix(const FbxAMatrix& am)
+{
+    FbxMatrix m;
+    m.SetRow(0, am.GetRow(0));
+    m.SetRow(1, am.GetRow(1));
+    m.SetRow(2, am.GetRow(2));
+    m.SetRow(3, am.GetRow(3));
+    return m;
+}
+
+struct PoseEntry { FbxNode* node; FbxMatrix mat; bool isLocal; };
+
+void GeometryProcessor::ProcessPoses(
+    FbxScene* scene,
+    const FbxAMatrix& convMatrix,
+    const FbxAMatrix& convInv,
+    double scale)
+{
+    int poseCount = scene->GetPoseCount();
+    for (int pi = 0; pi < poseCount; ++pi)
+    {
+        FbxPose* pose = scene->GetPose(pi);
+        if (!pose->IsBindPose()) continue;
+
+        int entryCount = pose->GetCount();
+
+        // 変換後の行列を退避してからエントリを再構築する
+        std::vector<PoseEntry> entries;
+        entries.reserve(entryCount);
+
+        for (int ei = 0; ei < entryCount; ++ei)
+        {
+            FbxNode*  node    = pose->GetNode(ei);
+            FbxMatrix rawMat  = pose->GetMatrix(ei);
+            bool      isLocal = pose->IsLocalMatrix(ei);
+
+            FbxAMatrix am    = FbxMatrixToAMatrix(rawMat);
+            FbxAMatrix amNew = ConvertClusterMatrix(am, convMatrix, convInv, scale);
+            entries.push_back({ node, FbxAMatrixToMatrix(amNew), isLocal });
+        }
+
+        // エントリを逆順に削除してから変換済みの行列で再追加
+        for (int ei = entryCount - 1; ei >= 0; --ei)
+            pose->Remove(ei);
+
+        for (const PoseEntry& e : entries)
+            pose->Add(e.node, e.mat, e.isLocal);
+
+        std::cout << "[Geometry] Converted bind pose: " << pose->GetName()
+                  << " (" << entryCount << " entries)\n";
     }
 }
 
