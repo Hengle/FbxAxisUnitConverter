@@ -11,8 +11,10 @@ public:
 
 private:
     void ProcessMesh(FbxMesh* mesh, const FbxAMatrix& convMatrix, double scale);
+    void ProcessSkin(FbxMesh* mesh, const FbxAMatrix& convMatrix, const FbxAMatrix& convInv, double scale);
     void FlipWindingOrder(FbxMesh* mesh);
 
     bool mFlipWinding;
-    std::set<FbxMesh*> mProcessedMeshes;
+    std::set<FbxMesh*>    mProcessedMeshes;
+    std::set<FbxCluster*> mProcessedClusters;
 };

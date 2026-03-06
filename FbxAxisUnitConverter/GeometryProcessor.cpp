@@ -159,12 +159,76 @@ void GeometryProcessor::ProcessMesh(FbxMesh* mesh, const FbxAMatrix& convMatrix,
         }
     }
 
+    // --- Skin deformers ---
+    FbxAMatrix convInv = convMatrix.Inverse();
+    ProcessSkin(mesh, convMatrix, convInv, scale);
+
     // --- Winding order flip (when handedness changes) ---
     if (mFlipWinding)
         FlipWindingOrder(mesh);
 
     mProcessedMeshes.insert(mesh);
     std::cout << "[Geometry] Processed mesh: " << mesh->GetName() << "\n";
+}
+
+// ---------------------------------------------------------------------------
+// Helper: convert a cluster bind-pose matrix to the new coordinate system.
+//   M_new = convMatrix * M_old * convInv
+//   Translation component is additionally multiplied by scale.
+// ---------------------------------------------------------------------------
+static FbxAMatrix ConvertClusterMatrix(
+    const FbxAMatrix& mat,
+    const FbxAMatrix& convMatrix,
+    const FbxAMatrix& convInv,
+    double scale)
+{
+    FbxAMatrix newMat = convMatrix * mat * convInv;
+    FbxVector4 t = newMat.GetT();
+    newMat.SetT(FbxVector4(t[0] * scale, t[1] * scale, t[2] * scale, t[3]));
+    return newMat;
+}
+
+void GeometryProcessor::ProcessSkin(
+    FbxMesh* mesh,
+    const FbxAMatrix& convMatrix,
+    const FbxAMatrix& convInv,
+    double scale)
+{
+    int deformerCount = mesh->GetDeformerCount(FbxDeformer::eSkin);
+    for (int di = 0; di < deformerCount; ++di)
+    {
+        FbxSkin* skin = static_cast<FbxSkin*>(mesh->GetDeformer(di, FbxDeformer::eSkin));
+        if (!skin) continue;
+
+        int clusterCount = skin->GetClusterCount();
+        for (int ci = 0; ci < clusterCount; ++ci)
+        {
+            FbxCluster* cluster = skin->GetCluster(ci);
+            if (!cluster) continue;
+            if (mProcessedClusters.count(cluster)) continue;
+
+            // TransformMatrix: mesh world transform at bind time
+            FbxAMatrix tm;
+            cluster->GetTransformMatrix(tm);
+            cluster->SetTransformMatrix(ConvertClusterMatrix(tm, convMatrix, convInv, scale));
+
+            // TransformLinkMatrix: bone world transform at bind time
+            FbxAMatrix tlm;
+            cluster->GetTransformLinkMatrix(tlm);
+            cluster->SetTransformLinkMatrix(ConvertClusterMatrix(tlm, convMatrix, convInv, scale));
+
+            // TransformParentMatrix (optional, only valid when set)
+            if (cluster->IsTransformParentSet())
+            {
+                FbxAMatrix tpm;
+                cluster->GetTransformParentMatrix(tpm);
+                cluster->SetTransformParentMatrix(ConvertClusterMatrix(tpm, convMatrix, convInv, scale));
+            }
+
+            mProcessedClusters.insert(cluster);
+            std::cout << "[Geometry] Processed cluster: " << cluster->GetName() << "\n";
+        }
+    }
 }
 
 void GeometryProcessor::FlipWindingOrder(FbxMesh* mesh)
